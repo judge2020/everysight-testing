@@ -1,0 +1,4 @@
+// Generic build defaults. Set your real values in ignored Local.xcconfig.
+PRODUCT_BUNDLE_IDENTIFIER = org.example.discordglasses
+DISCORD_APPLICATION_ID =
+#include? "Local.xcconfig"

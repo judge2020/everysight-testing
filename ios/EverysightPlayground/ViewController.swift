@@ -2,151 +2,434 @@ import UIKit
 import MaverickAI
 
 final class ViewController: UITableViewController {
-    private struct Row {
-        let key: String
-        let title: String
-    }
-    private struct Section {
-        let title: String
-        let note: String
-        let rows: [Row]
-    }
-    private let monitor = SensorMonitor()
+    private let discord = DiscordBridge()
     private let connectionListener = ConnectionListener()
     private let statusLabel = UILabel()
-    private let cadenceLabel = UILabel()
-    private let configureButton = UIButton(type: .system)
+    private let glassesLabel = UILabel()
+    private let noticeLabel = UILabel()
+    private let signInButton = UIButton(type: .system)
     private let connectButton = UIButton(type: .system)
-    private let pauseButton = UIButton(type: .system)
-    private let reconnectSwitch = UISwitch()
+    private let configureButton = UIButton(type: .system)
+    private let mirrorSwitch = UISwitch()
+    private let preferences = UserDefaults.standard
+    private var pump: Timer?
     private var timer: Timer?
     private var notifications: [NSObjectProtocol] = []
-    private var latest: SensorSnapshot?
-    private var ticks = 0
-    private var monitoringWanted = true
     private var foreground = true
     private var initialized = false
     private var nextRetry: TimeInterval = 0
     private var retryDelay: TimeInterval = 1
     private var connectionStarted: TimeInterval?
-    private var hud: StatusHUD?
-    private let preferences = UserDefaults.standard
+    private var hud: MessageHUD?
+    private var conversations: [[AnyHashable: Any]] = []
+    private var messages: [DiscordMessage] = []
+    private enum HUDFocus { case conversations, messages }
+    private var hudFocus = HUDFocus.conversations
+    private var highlightedUser: String?
+    private var previewMessages: [String: [DiscordMessage]] = [:]
+    private var highlightedConversationIndex: Int {
+        conversations.firstIndex { $0["userID"] as? String == (highlightedUser ?? selectedUser) } ?? 0
+    }
+    private var selectedUser: String?
+    private var selectedMessageID: String?
+    private var page = 0
+    private var displayRevision = 0
+    private var visibleUntil: Date?
+    private var loadingConversations = false
+    private var historyRequest = UUID()
+    private var loadingHistory = false
+    private var historyChanges: [String: DiscordMessage] = [:]
+    private var historyDeletions = Set<String>()
+    private var captureCover: UIView?
     private var autoReconnect: Bool {
         get { preferences.object(forKey: "autoReconnect") as? Bool ?? true }
         set { preferences.set(newValue, forKey: "autoReconnect") }
     }
+    private var mirrorsMessages: Bool {
+        get { preferences.object(forKey: "mirrorDiscordMessages") as? Bool ?? true }
+        set { preferences.set(newValue, forKey: "mirrorDiscordMessages") }
+    }
     private var hasKey: Bool {
         guard let url = Bundle.main.url(forResource: "sdk", withExtension: "key"),
-              let bytes = try? Data(contentsOf: url) else { return false }
-        return !bytes.isEmpty
+              let data = try? Data(contentsOf: url) else { return false }
+        return !data.isEmpty
     }
-    private var isSimulator: Bool { initialized && Evs.shared.glassesService.isSimulatorConfigured() }
     private var ready: Bool { initialized && Evs.shared.glassesService.isReady() }
-
-    private var sections: [Section] {
-        let simulated = isSimulator
-        return [
-            Section(title: "Device & environment", note: "Values refresh every second. Event readings include their age; missing data is never shown as zero.", rows: [
-                Row(key: "battery", title: "Battery"), Row(key: "batteryPower", title: "Battery power"),
-                Row(key: "charging", title: "Charging"), Row(key: "ambient", title: "Ambient light"),
-                Row(key: "proximity", title: "Proximity · on-face detection"),
-                Row(key: "brightness", title: "Display brightness"), Row(key: "display", title: "Display power"),
-                Row(key: "autoBrightness", title: "Auto brightness")]),
-            Section(title: "Eye tracking", note: simulated
-                ? "Simulator eye features are synthetic, not measurements of your eye. Values below come from SDK callbacks. Eye-camera coordinates are not calibrated screen gaze."
-                : "Eye-camera coordinates. Iris/pupil: center x, center y, axes a, b, angle. Pupil position is not calibrated screen gaze in SDK 0.2.0.", rows: [
-                Row(key: "eyeState", title: "Tracker state"), Row(key: "eyeFPS", title: "Feature rate"),
-                Row(key: "eyeValid", title: "Geometry validity"), Row(key: "pupilVisibility", title: "Pupil visibility"),
-                Row(key: "pupilCenter", title: "Filtered pupil center"), Row(key: "iris", title: "Iris ellipse"),
-                Row(key: "pupil", title: "Pupil ellipse"), Row(key: "earCorner", title: "Ear-side eye corner"),
-                Row(key: "noseCorner", title: "Nose-side eye corner"), Row(key: "eyelidTop", title: "Upper eyelid apex"),
-                Row(key: "eyelidBottom", title: "Lower eyelid apex"), Row(key: "led", title: "LED glint"),
-                Row(key: "filteredLED", title: "Filtered LED glint"), Row(key: "eyeFrame", title: "Eye frame metadata"),
-                Row(key: "eyeError", title: "Eye tracker error")]),
-            Section(title: "Motion & orientation", note: "Requested sensor rate: Slow (1 Hz fused orientation). Raw accelerometer, gyroscope and magnetometer streams are enabled separately. Simulator sliders supply orientation; raw streams may be absent.", rows: [
-                Row(key: "orientation", title: "Head orientation"), Row(key: "quaternion", title: "Quaternion"),
-                Row(key: "calibration", title: "IMU calibration"), Row(key: "acc", title: "Accelerometer · m/s²"),
-                Row(key: "gyro", title: "Gyroscope · rad/s"), Row(key: "mag", title: "Magnetometer · mGauss"),
-                Row(key: "sensorError", title: "Sensor diagnostic")]),
-            Section(title: "Camera", note: "AI vision camera capture is disabled. This app never opens or reads the scene camera.", rows: [
-                Row(key: "cameraDisabled", title: "Camera capture")]),
-            Section(title: "Microphones", note: "Both directional and omni LC3 streams are opened. The directional PCM stream supplies the one-second RMS/peak meter in dBFS; this is not a calibrated sound-pressure reading.", rows: [
-                Row(key: "micState", title: "Microphone state"), Row(key: "audioLevel", title: "Directional audio level"),
-                Row(key: "directional", title: "Directional throughput"), Row(key: "directionalPackets", title: "Directional packets"),
-                Row(key: "omni", title: "Omni throughput"), Row(key: "omniPackets", title: "Omni packets"),
-                Row(key: "micError", title: "Microphone error")]),
-            Section(title: "Input & system events", note: simulated ? "Proximity is not simulated. Touch and power events can be injected from the simulator dashboard." : "Latest event and total received count for this monitoring session.", rows: [
-                Row(key: "touch", title: "Last touch gesture"), Row(key: "powerButton", title: "Last power-button event"),
-                Row(key: "device.\(M2DeviceType.ambient.name)", title: "Ambient sensor enabled"),
-                Row(key: "device.\(M2DeviceType.prox.name)", title: "Proximity sensor enabled"),
-                Row(key: "device.\(M2DeviceType.touch.name)", title: "Touch sensor enabled"),
-                Row(key: "systemError", title: "Last system error")])
-        ]
+    private var previewing: Bool {
+#if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--discord-hud-preview")
+#else
+        false
+#endif
     }
+    private var selectedMessage: DiscordMessage? { messages.first { $0.id == selectedMessageID } }
 
     init() { super.init(style: .insetGrouped) }
     required init?(coder: NSCoder) { super.init(coder: coder) }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        title = "Discord Glasses"
+        navigationItem.rightBarButtonItem = UIBarButtonItem(title: "Sign out", style: .plain, target: self, action: #selector(signOut))
         tableView.rowHeight = UITableView.automaticDimension
         tableView.estimatedRowHeight = 80
-        tableView.allowsSelection = false
         tableView.selfSizingInvalidation = .enabledIncludingConstraints
+        refreshControl = UIRefreshControl()
+        refreshControl?.addTarget(self, action: #selector(reloadDiscord), for: .valueChanged)
         buildHeader()
-        connectionListener.changed = { [weak self] in
-            DispatchQueue.main.async { self?.connectionChanged() }
+        discord.statusChanged = { [weak self] status, isReady in
+            guard let self else { return }
+            self.statusLabel.text = "Discord · \(status)"
+            self.statusLabel.textColor = isReady ? .systemIndigo : .secondaryLabel
+            self.signInButton.isEnabled = self.discord.configured && !isReady
+            if isReady { self.loadConversations() }
+            else { self.hideMessage() }
+            self.sizeHeader()
         }
-        connectionListener.failed = { [weak self] in
-            DispatchQueue.main.async {
-                guard let self, self.autoReconnect, self.connectionStarted != nil else { return }
-                self.connectionStarted = nil
-                self.nextRetry = ProcessInfo.processInfo.systemUptime + self.retryDelay
-                self.retryDelay = min(self.retryDelay * 2, 15)
-            }
+        discord.messageChanged = { [weak self] value, incoming in
+            guard let self, let message = DiscordMessage(value) else { return }
+            self.receive(message, incoming: incoming)
         }
-        connectionListener.configured = { [weak self] in
-            DispatchQueue.main.async { self?.nextRetry = 0; self?.retryDelay = 1 }
+        discord.messageDeleted = { [weak self] id in
+            guard let self else { return }
+            if self.loadingHistory { self.historyDeletions.insert(id) }
+            self.historyChanges.removeValue(forKey: id)
+            self.messages.removeAll { $0.id == id }
+            if self.selectedMessageID == id { self.hideMessage(); self.selectedMessageID = nil }
+            self.tableView.reloadData()
         }
-        notifications.append(NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification,
-            object: nil, queue: .main) { [weak self] _ in
-                guard let self else { return }
-                self.foreground = false
-                self.timer?.invalidate(); self.timer = nil
-                self.monitor.stop()
-            })
-        notifications.append(NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification,
-            object: nil, queue: .main) { [weak self] _ in
-                guard let self else { return }
-                self.foreground = true
-                self.nextRetry = 0
-                self.startTimer()
-                self.refresh()
-            })
-        // Initialize once; the SDK restores its configured device independently of our UI.
+        discord.sessionCleared = { [weak self] in
+            guard let self else { return }
+            self.historyRequest = UUID(); self.loadingConversations = false; self.loadingHistory = false
+            self.historyChanges.removeAll(); self.historyDeletions.removeAll()
+            self.conversations.removeAll(); self.messages.removeAll()
+            self.selectedUser = nil; self.selectedMessageID = nil; self.highlightedUser = nil; self.hudFocus = .conversations
+            self.noticeLabel.text = "Signed out. Message previews cleared."
+            self.hideMessage(); self.tableView.reloadData()
+        }
+        connectionListener.changed = { [weak self] in DispatchQueue.main.async { self?.connectionChanged() } }
+        connectionListener.failed = { [weak self] in DispatchQueue.main.async {
+            guard let self, self.autoReconnect, self.connectionStarted != nil else { return }
+            self.connectionStarted = nil
+            self.nextRetry = ProcessInfo.processInfo.systemUptime + self.retryDelay
+            self.retryDelay = min(self.retryDelay * 2, 15)
+        } }
+        connectionListener.configured = { [weak self] in DispatchQueue.main.async {
+            self?.nextRetry = 0; self?.retryDelay = 1
+        } }
+        observeLifecycle()
         Evs.shared.doInit()
         initialized = true
         Evs.shared.glassesService.registerConnectionListener(listener: connectionListener)
         restoreSuccessfulTargetIfNeeded()
-        startTimer()
-        refresh()
+        // SDK callbacks are pumped on the main thread, separately from connection checks.
+        let pump = Timer(timeInterval: 0.03, repeats: true) { [weak self] _ in self?.discord.pump() }
+        RunLoop.main.add(pump, forMode: .common); self.pump = pump
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.refreshGlasses() }
+        RunLoop.main.add(timer, forMode: .common); self.timer = timer
+        refreshGlasses()
+        if previewing {
+            statusLabel.text = "TEST PREVIEW · Discord is not connected"
+            let sampleText = "This is a local test message for the split glasses display. Choose a conversation on the left, then read messages on the right. Tap to advance through long messages. Swipe up or down to browse messages; swipe back to return to the DM selector. Hold to hide message text. This sample stays entirely on this device."
+            for (index, name) in ["Alex", "Morgan", "River", "Casey", "Jordan", "Sam", "Taylor"].enumerated() {
+                let userID = "preview-\(index)"
+                let samples = (0..<3).map { offset in DiscordMessage([
+                    "id": "preview-\(index)-\(offset)", "userID": userID,
+                    "author": "\(name) (test)", "conversation": name,
+                    "content": offset == 0 ? sampleText : "Older test message \(offset) from \(name).",
+                    "timestamp": NSNumber(value: (Date().timeIntervalSince1970 - Double(offset * 60)) * 1000)
+                ])! }
+                previewMessages[userID] = samples
+                conversations.append(["userID": userID, "name": name, "lastMessageID": samples[0].id])
+            }
+            if let first = conversations.first?["userID"] as? String { loadHistory(first) }
+        } else { discord.restoreSession() }
     }
 
     deinit {
-        timer?.invalidate()
+        pump?.invalidate(); timer?.invalidate()
         notifications.forEach(NotificationCenter.default.removeObserver)
-        monitor.stop()
         if initialized { Evs.shared.glassesService.unregisterConnectionListener(listener: connectionListener) }
     }
 
-    private func startTimer() {
-        guard timer == nil else { return }
-        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
-        timer.tolerance = 0.05
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
+    private func observeLifecycle() {
+        notifications.append(NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.foreground = false; self.hideMessage()
+            // Cover message text in the app switcher's snapshot.
+            let cover = UIView(frame: self.navigationController?.view.bounds ?? self.view.bounds)
+            cover.backgroundColor = .systemBackground
+            cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            (self.navigationController?.view ?? self.view).addSubview(cover)
+            self.captureCover = cover
+        })
+        notifications.append(NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            self.foreground = true; self.captureCover?.removeFromSuperview(); self.captureCover = nil
+            self.nextRetry = 0; self.refreshGlasses()
+            if self.discord.ready { self.loadConversations() }
+        })
     }
 
+    @objc private func signIn() { discord.signIn() }
+    @objc private func signOut() { discord.signOut(); refreshControl?.endRefreshing() }
+    @objc private func reloadDiscord() { loadConversations() }
+    private func loadConversations() {
+        guard discord.ready, !loadingConversations else { refreshControl?.endRefreshing(); return }
+        loadingConversations = true
+        discord.loadConversations { [weak self] rows, error in
+            guard let self else { return }
+            self.loadingConversations = false; self.refreshControl?.endRefreshing()
+            if let error { self.noticeLabel.text = "Could not load conversations: \(error)" }
+            else {
+                self.conversations = rows.sorted {
+                    UInt64($0["lastMessageID"] as? String ?? "") ?? 0 > UInt64($1["lastMessageID"] as? String ?? "") ?? 0
+                }
+                self.noticeLabel.text = rows.isEmpty ? "No conversations available to this app yet. Both people must have used this Discord application for history to appear." : "Choose a conversation, then tap a message to show it on glasses."
+            }
+            self.tableView.reloadData(); self.sizeHeader()
+            if error == nil {
+                let userID = self.selectedUser.flatMap { selected in
+                    self.conversations.contains { $0["userID"] as? String == selected } ? selected : nil
+                } ?? self.conversations.first?["userID"] as? String
+                if let userID { self.loadHistory(userID) }
+            }
+        }
+    }
+    private func loadHistory(_ userID: String) {
+        selectedUser = userID; highlightedUser = userID; selectedMessageID = nil; messages.removeAll(); hideMessage()
+        if previewing {
+            messages = previewMessages[userID] ?? []
+            if let latest = messages.first { show(latest) }
+            tableView.reloadData(); updateHUD()
+            return
+        }
+        let displayRevision = self.displayRevision
+        historyChanges.removeAll(); historyDeletions.removeAll()
+        let request = UUID(); historyRequest = request; loadingHistory = true
+        noticeLabel.text = "Loading recent messages…"; tableView.reloadData(); sizeHeader()
+        discord.loadMessages(forUser: userID) { [weak self] rows, error in
+            guard let self, self.historyRequest == request, self.selectedUser == userID else { return }
+            self.loadingHistory = false
+            if let error { self.noticeLabel.text = error + " · History requires both people to have used this app." }
+            else { self.noticeLabel.text = rows.isEmpty ? "No recent messages in this conversation." : "Tap a message to read it on glasses." }
+            var merged = Dictionary(rows.compactMap(DiscordMessage.init).map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
+            self.historyChanges.forEach { merged[$0.key] = $0.value }
+            self.historyDeletions.forEach { merged.removeValue(forKey: $0) }
+            self.messages = merged.values.sorted { $0.timestamp > $1.timestamp }
+            self.historyChanges.removeAll(); self.historyDeletions.removeAll()
+            if error == nil, self.foreground, self.discord.ready, self.mirrorsMessages,
+               self.displayRevision == displayRevision,
+               let latest = self.messages.first(where: { !$0.disclosure }) {
+                self.show(latest)
+            }
+            self.tableView.reloadData(); self.sizeHeader()
+        }
+    }
+    private func receive(_ message: DiscordMessage, incoming: Bool) {
+        if let index = conversations.firstIndex(where: { $0["userID"] as? String == message.userID }) {
+            conversations[index]["lastMessageID"] = message.id
+        } else {
+            conversations.insert(["userID": message.userID, "name": message.conversation, "lastMessageID": message.id], at: 0)
+        }
+        if incoming && mirrorsMessages && foreground && selectedUser != message.userID {
+            historyRequest = UUID(); loadingHistory = false; historyChanges.removeAll(); historyDeletions.removeAll()
+            selectedUser = message.userID; highlightedUser = message.userID; messages.removeAll()
+        }
+        if selectedUser == message.userID {
+            if loadingHistory { historyChanges[message.id] = message }
+            messages.removeAll { $0.id == message.id }; messages.append(message)
+            messages.sort { $0.timestamp > $1.timestamp }
+            if messages.count > 200 { messages.removeLast(messages.count - 200) }
+            if incoming && mirrorsMessages && foreground { show(message) }
+            else if selectedMessageID == message.id { page = 0; updateHUD() }
+        }
+        if incoming { noticeLabel.text = "New direct message received. Tap a message to show it on glasses." }
+        tableView.reloadData(); sizeHeader()
+    }
+    private func show(_ message: DiscordMessage) {
+        displayRevision += 1
+        selectedMessageID = message.id; page = 0
+        visibleUntil = Date().addingTimeInterval(30)
+        updateHUD()
+    }
+    @objc private func hideMessage() { displayRevision += 1; visibleUntil = nil; page = 0; updateHUD() }
+    @objc private func nextPage() { turnPage(1) }
+    @objc private func previousPage() { turnPage(-1) }
+    private func turnPage(_ delta: Int) {
+        guard let message = selectedMessage else { return }
+        let count = MessageLayout.pages(message.content, columns: 28).count
+        page = max(0, min(count - 1, page + delta))
+        visibleUntil = Date().addingTimeInterval(30); updateHUD()
+    }
+    @objc private func openDiscord() { if let message = selectedMessage { discord.openMessage(message.id) } }
+    @objc private func mirrorChanged() {
+        mirrorsMessages = mirrorSwitch.isOn
+        if !mirrorsMessages { hideMessage() }
+    }
+    private func connectionChanged() {
+        if ready { saveSuccessfulTarget(); retryDelay = 1; nextRetry = 0; connectionStarted = nil }
+        else { hud = nil; discord.setShowingChat(false) }
+        refreshGlasses()
+    }
+    private func refreshGlasses() {
+        guard initialized, foreground else { return }
+        if !ready { reconnectIfNeeded() }
+        let service = Evs.shared.glassesService
+        glassesLabel.text = "Glasses · \(ready ? "Ready" : service.getConnectionStatus().name)\n\(hasKey ? "" : "Developer key missing · ")\(service.getDeviceName())"
+        connectButton.setTitle(service.isConnected() || connectionStarted != nil ? "Disconnect" : "Connect", for: .normal)
+        connectButton.isEnabled = hasKey && service.hasConfiguredDevice()
+        if let until = visibleUntil, until <= Date() { visibleUntil = nil; displayRevision += 1 }
+        updateHUD(); sizeHeader()
+    }
+    @objc private func configure() {
+        nextRetry = .greatestFiniteMagnitude; connectionStarted = nil
+        Evs.shared.glassesService.disconnect(); autoReconnect = true
+        Evs.shared.showAppUI(option: M2AppUIOption.companion.DefaultConfigure)
+    }
+    @objc private func toggleConnection() {
+        let service = Evs.shared.glassesService
+        if service.isConnected() || connectionStarted != nil {
+            autoReconnect = false; connectionStarted = nil; service.disconnect()
+        } else { autoReconnect = true; nextRetry = 0; retryDelay = 1; reconnectIfNeeded() }
+        refreshGlasses()
+    }
+    private func handleHUDTouch(_ touch: M2Touch) {
+        guard foreground else { return }
+        if touch == .longtap {
+            hudFocus = .conversations; hideMessage()
+        } else if touch == .backward {
+            hudFocus = .conversations; updateHUD()
+        } else if touch == .up || touch == .down {
+            let delta = touch == .up ? -1 : 1
+            if hudFocus == .conversations {
+                guard !conversations.isEmpty else { return }
+                let index = (highlightedConversationIndex + delta + conversations.count) % conversations.count
+                highlightedUser = conversations[index]["userID"] as? String
+                updateHUD()
+            } else {
+                guard !messages.isEmpty else { return }
+                let index = messages.firstIndex { $0.id == selectedMessageID } ?? 0
+                let next = max(0, min(messages.count - 1, index + delta))
+                show(messages[next]); tableView.reloadData()
+            }
+        } else if touch == .tap || touch == .forward {
+            if hudFocus == .conversations {
+                guard conversations.indices.contains(highlightedConversationIndex),
+                      let userID = conversations[highlightedConversationIndex]["userID"] as? String else { return }
+                hudFocus = .messages
+                if selectedUser == userID, let latest = messages.first { show(latest) }
+                else { loadHistory(userID) }
+                updateHUD()
+            } else if let message = selectedMessage {
+                let count = MessageLayout.pages(message.content, columns: 28).count
+                page = (page + 1) % count
+                visibleUntil = Date().addingTimeInterval(30); displayRevision += 1
+                updateHUD()
+            }
+        }
+    }
+    private func updateHUD() {
+        guard initialized else { return }
+        guard ready else { discord.setShowingChat(false); return }
+        if hud == nil {
+            let screen = MessageHUD()
+            screen.gesture = { [weak self] touch in DispatchQueue.main.async { self?.handleHUDTouch(touch) } }
+            hud = screen; Evs.shared.screenService.addScreen(screen: screen)
+        }
+        let showing = foreground && visibleUntil != nil && selectedMessage != nil && (discord.ready || previewing)
+        discord.setShowingChat(showing)
+        let names = foreground ? conversations.map { $0["name"] as? String ?? "Discord user" } : []
+        let conversation = selectedMessage?.conversation
+            ?? conversations.first(where: { $0["userID"] as? String == selectedUser })?["name"] as? String
+            ?? "Messages"
+        var sender = ""
+        var body = [foreground && (discord.ready || previewing) ? "Choose a DM on the left" : "Messages hidden"]
+        var position = ""
+        if loadingHistory { body = ["Loading messages…"] }
+        if showing, let message = selectedMessage {
+            let pages = MessageLayout.pages(message.content, columns: 28)
+            page = min(page, pages.count - 1)
+            let time = DateFormatter.localizedString(from: Date(timeIntervalSince1970: message.timestamp / 1000), dateStyle: .none, timeStyle: .short)
+            sender = "\(message.author) · \(time)\(message.edited ? " *" : "")"
+            body = pages[page]
+            let index = messages.firstIndex { $0.id == message.id } ?? 0
+            position = "Msg \(index + 1)/\(messages.count) p\(page + 1)/\(pages.count) · "
+        }
+        let hint = hudFocus == .conversations ? "Up/down: DM · Tap/right: open" : "Up/down: msg · Tap: page · Left: DMs"
+        hud?.update(names: names, highlighted: highlightedConversationIndex,
+                    focusDMs: hudFocus == .conversations, conversation: foreground ? conversation : "DISCORD",
+                    sender: sender, body: body,
+                    footer: foreground ? position + hint + " · Hold: hide" : "",
+                    testing: previewing)
+    }
+
+    private func buildHeader() {
+        let title = UILabel(); title.text = "Your messages, at a glance."
+        title.font = .preferredFont(forTextStyle: .title2); title.numberOfLines = 0
+        [statusLabel, glassesLabel, noticeLabel].forEach { $0.numberOfLines = 0; $0.font = .preferredFont(forTextStyle: .subheadline) }
+        noticeLabel.textColor = .secondaryLabel
+        noticeLabel.text = "Sign in, then connect your glasses. New incoming DMs appear for 30 seconds while this app is active."
+        func button(_ title: String, _ action: Selector, _ button: UIButton = UIButton(type: .system)) -> UIButton {
+            button.setTitle(title, for: .normal); button.addTarget(self, action: action, for: .touchUpInside)
+            return button
+        }
+        button("Sign in with Discord", #selector(signIn), signInButton).configuration = .filled()
+        _ = button("Configure glasses", #selector(configure), configureButton)
+        _ = button("Connect", #selector(toggleConnection), connectButton)
+        let connection = UIStackView(arrangedSubviews: [configureButton, connectButton]); connection.distribution = .fillEqually
+        let mirrorLabel = UILabel(); mirrorLabel.text = "Show incoming DMs on glasses"; mirrorLabel.numberOfLines = 0
+        mirrorSwitch.isOn = mirrorsMessages; mirrorSwitch.addTarget(self, action: #selector(mirrorChanged), for: .valueChanged)
+        let mirror = UIStackView(arrangedSubviews: [mirrorLabel, mirrorSwitch]); mirror.spacing = 12
+        let controls = UIStackView(arrangedSubviews: [button("Previous", #selector(previousPage)), button("Next", #selector(nextPage)), button("Hide", #selector(hideMessage))]); controls.distribution = .fillEqually
+        let limits = UILabel(); limits.numberOfLines = 0; limits.font = .preferredFont(forTextStyle: .footnote); limits.textColor = .secondaryLabel
+        limits.text = "Social SDK messages only. History requires both people to have used this app; up to 72 hours. This is not your full Discord inbox. Images and other attachments open in Discord. Message previews clear when the app is inactive."
+        let stack = UIStackView(arrangedSubviews: [title, statusLabel, signInButton, glassesLabel, connection, mirror, controls, button("Open selected message in Discord", #selector(openDiscord)), noticeLabel, limits])
+        stack.axis = .vertical; stack.spacing = 14; stack.translatesAutoresizingMaskIntoConstraints = false
+        let header = UIView(); header.addSubview(stack)
+        NSLayoutConstraint.activate([stack.topAnchor.constraint(equalTo: header.topAnchor, constant: 20), stack.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 20), stack.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -20), stack.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)])
+        tableView.tableHeaderView = header
+    }
+    private func sizeHeader() {
+        guard let header = tableView.tableHeaderView else { return }
+        let height = header.systemLayoutSizeFitting(CGSize(width: tableView.bounds.width, height: 0), withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
+        if abs(header.frame.height - height) > 1 {
+            header.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: height); tableView.tableHeaderView = header
+        }
+    }
+    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); sizeHeader() }
+    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
+    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { section == 0 ? "Conversations" : "Recent messages" }
+    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { section == 0 ? max(1, conversations.count) : max(1, messages.count) }
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "message") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "message")
+        var content = UIListContentConfiguration.subtitleCell()
+        content.secondaryTextProperties.numberOfLines = 4
+        cell.accessoryType = .none
+        if indexPath.section == 0 {
+            if conversations.isEmpty { content.text = "No conversations yet"; content.secondaryText = "Pull down to refresh after signing in." }
+            else {
+                let row = conversations[indexPath.row]
+                content.text = row["name"] as? String
+                content.secondaryText = "Load recent messages"
+                if row["userID"] as? String == selectedUser { cell.accessoryType = .checkmark }
+            }
+        } else if messages.isEmpty { content.text = "No messages loaded"; content.secondaryText = "Choose a conversation above, or wait for an incoming DM." }
+        else {
+            let message = messages[indexPath.row]
+            let date = Date(timeIntervalSince1970: message.timestamp / 1000)
+            content.text = "\(message.author) · \(DateFormatter.localizedString(from: date, dateStyle: .short, timeStyle: .short))\(message.edited ? " · edited" : "")"
+            content.secondaryText = message.content
+            if message.id == selectedMessageID { cell.accessoryType = .checkmark }
+        }
+        cell.contentConfiguration = content
+        return cell
+    }
+    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        if indexPath.section == 0, conversations.indices.contains(indexPath.row), let userID = conversations[indexPath.row]["userID"] as? String { hudFocus = .messages; loadHistory(userID) }
+        else if indexPath.section == 1, messages.indices.contains(indexPath.row) { hudFocus = .messages; show(messages[indexPath.row]); tableView.reloadData() }
+    }
     private func restoreSuccessfulTargetIfNeeded() {
         let service = Evs.shared.glassesService
         guard autoReconnect, !service.hasConfiguredDevice() else { return }
@@ -168,18 +451,6 @@ final class ViewController: UITableViewController {
             preferences.set(service.getDeviceName(), forKey: "lastGlassesName")
             preferences.removeObject(forKey: "lastSimulatorHost")
         }
-    }
-
-    private func connectionChanged() {
-        if ready {
-            saveSuccessfulTarget()
-            retryDelay = 1; nextRetry = 0; connectionStarted = nil
-            if foreground && monitoringWanted { monitor.start(); addHUDIfNeeded() }
-        } else {
-            monitor.stop()
-            hud = nil
-        }
-        // Telemetry is rendered only by the 1 Hz timer, including connection callbacks.
     }
 
     private func reconnectIfNeeded() {
@@ -204,180 +475,6 @@ final class ViewController: UITableViewController {
         service.connect()
     }
 
-    private func refresh() {
-        guard initialized, foreground else { return }
-        if ready {
-            if monitoringWanted && !monitor.isRunning { connectionChanged() }
-            monitor.pollStatus()
-        } else { reconnectIfNeeded() }
-        latest = monitor.snapshot()
-        ticks += 1
-        let service = Evs.shared.glassesService
-        let state = ready ? (monitoringWanted ? "LIVE" : "PAUSED") : service.getConnectionStatus().name.uppercased()
-        let target = service.getDeviceName().isEmpty ? "Choose a device to begin" : service.getDeviceName()
-        statusLabel.text = "\(state)  ·  \(target)"
-        statusLabel.textColor = ready ? (monitoringWanted ? .systemTeal : .systemOrange) : .secondaryLabel
-        let time = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        cadenceLabel.text = "1 s refresh  ·  \(time)  ·  update \(ticks)\n\(hasKey ? "SDK 0.2.0" : "Developer key missing") · \(service.isSimulatorConfigured() ? "simulated sensors" : "glasses sensors")"
-        connectButton.setTitle(service.isConnected() || connectionStarted != nil ? "Disconnect" : "Connect", for: .normal)
-        connectButton.isEnabled = hasKey && service.hasConfiguredDevice()
-        pauseButton.setTitle(monitoringWanted ? "Pause sensors" : "Resume sensors", for: .normal)
-        pauseButton.isEnabled = ready
-        reconnectSwitch.isOn = autoReconnect
-        updateHUD()
-        // Keep scroll position and interaction stable while data changes at 1 Hz.
-        for indexPath in tableView.indexPathsForVisibleRows ?? [] {
-            if let cell = tableView.cellForRow(at: indexPath) { configureCell(cell, at: indexPath) }
-        }
-        // Respect Dynamic Type and orientation without a fixed-height header clipping controls.
-        sizeHeader()
-    }
-
-    @objc private func configure() {
-        nextRetry = .greatestFiniteMagnitude
-        connectionStarted = nil
-        monitor.stop()
-        Evs.shared.glassesService.disconnect()
-        autoReconnect = true
-        // Configuration UI connects the selected target. A later Configure callback releases the retry hold.
-        Evs.shared.showAppUI(option: M2AppUIOption.companion.DefaultConfigure)
-    }
-    @objc private func toggleConnection() {
-        let service = Evs.shared.glassesService
-        if service.isConnected() || connectionStarted != nil {
-            autoReconnect = false
-            connectionStarted = nil
-            monitor.stop()
-            service.disconnect()
-        } else {
-            autoReconnect = true
-            nextRetry = 0; retryDelay = 1
-            reconnectIfNeeded()
-        }
-        refresh()
-    }
-    @objc private func toggleMonitoring() {
-        monitoringWanted.toggle()
-        if monitoringWanted && ready { monitor.start() } else { monitor.stop() }
-        refresh()
-    }
-    @objc private func toggleReconnect() {
-        autoReconnect = reconnectSwitch.isOn
-        nextRetry = 0; retryDelay = 1
-        if !autoReconnect { connectionStarted = nil }
-    }
-
-    private func buildHeader() {
-        let heading = UILabel()
-        heading.text = "Sensor status"
-        heading.font = .preferredFont(forTextStyle: .largeTitle)
-        heading.adjustsFontForContentSizeCategory = true
-        statusLabel.font = .preferredFont(forTextStyle: .headline)
-        statusLabel.numberOfLines = 0
-        cadenceLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        cadenceLabel.textColor = .secondaryLabel
-        cadenceLabel.numberOfLines = 0
-        configureButton.setTitle("Configure", for: .normal)
-        configureButton.addTarget(self, action: #selector(configure), for: .touchUpInside)
-        connectButton.addTarget(self, action: #selector(toggleConnection), for: .touchUpInside)
-        pauseButton.addTarget(self, action: #selector(toggleMonitoring), for: .touchUpInside)
-        for button in [configureButton, connectButton, pauseButton] { button.configuration = .tinted() }
-        let controls = UIStackView(arrangedSubviews: [configureButton, connectButton])
-        controls.axis = .horizontal; controls.distribution = .fillEqually; controls.spacing = 10
-        let reconnectLabel = UILabel()
-        reconnectLabel.text = "Auto reconnect"
-        reconnectLabel.font = .preferredFont(forTextStyle: .body)
-        reconnectSwitch.accessibilityLabel = "Auto reconnect"
-        reconnectSwitch.isOn = autoReconnect
-        reconnectSwitch.addTarget(self, action: #selector(toggleReconnect), for: .valueChanged)
-        let reconnect = UIStackView(arrangedSubviews: [reconnectLabel, reconnectSwitch])
-        reconnect.axis = .horizontal; reconnect.alignment = .center
-        let note = UILabel()
-        note.text = "Reads motion, eye tracking, microphones and device sensors while active. Camera capture is disabled. Pause stops collection."
-        note.font = .preferredFont(forTextStyle: .footnote)
-        note.textColor = .secondaryLabel; note.numberOfLines = 0
-        let stack = UIStackView(arrangedSubviews: [heading, statusLabel, cadenceLabel, controls, pauseButton, reconnect, note])
-        stack.axis = .vertical; stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        let header = UIView()
-        header.addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: header.topAnchor, constant: 20),
-            stack.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -20),
-            stack.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        ])
-        tableView.tableHeaderView = header
-    }
-    private func sizeHeader() {
-        guard let header = tableView.tableHeaderView else { return }
-        let height = header.systemLayoutSizeFitting(
-            CGSize(width: tableView.bounds.width, height: 0),
-            withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
-        if abs(header.frame.height - height) > 1 {
-            header.frame = CGRect(x: 0, y: 0, width: tableView.bounds.width, height: height)
-            tableView.tableHeaderView = header
-        }
-    }
-    override func viewDidLayoutSubviews() { super.viewDidLayoutSubviews(); sizeHeader() }
-
-    override func numberOfSections(in tableView: UITableView) -> Int { sections.count }
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { sections[section].rows.count }
-    override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? { sections[section].title }
-    override func tableView(_ tableView: UITableView, titleForFooterInSection section: Int) -> String? { sections[section].note }
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "reading") ?? UITableViewCell(style: .subtitle, reuseIdentifier: "reading")
-        configureCell(cell, at: indexPath)
-        return cell
-    }
-    private func configureCell(_ cell: UITableViewCell, at indexPath: IndexPath) {
-        let row = sections[indexPath.section].rows[indexPath.row]
-        var content = UIListContentConfiguration.subtitleCell()
-        content.text = row.title
-        content.textProperties.font = .preferredFont(forTextStyle: .subheadline)
-        content.secondaryTextProperties.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        content.secondaryTextProperties.numberOfLines = 0
-        content.secondaryTextProperties.color = .secondaryLabel
-        if row.key == "cameraDisabled" {
-            content.secondaryText = "Disabled · not activated"
-        } else if let reading = latest?.readings[row.key], let snapshot = latest {
-            let age = max(0, snapshot.capturedAt - reading.receivedAt)
-            let timestamp = reading.deviceTimestamp.map { " · device \($0) ms" } ?? ""
-            let streaming = ["acc", "gyro", "mag", "quaternion", "orientation", "eyeValid", "pupilVisibility", "pupilCenter", "iris", "pupil", "audioLevel"].contains(row.key)
-            let stale = age > 3 && monitor.isRunning && streaming ? " · STALE" : ""
-            let value = monitor.isRunning ? reading.value : "Last: " + reading.value
-            content.secondaryText = value + String(format: "\n%.1f s ago · %d samples", age, reading.count) + timestamp + stale
-        } else if row.key.lowercased().contains("error") {
-            content.secondaryText = "No errors reported"
-        } else if isSimulator && row.key == "proximity" {
-            content.secondaryText = "Unavailable in simulator"
-        } else if isSimulator && ["eyeValid", "pupilVisibility", "pupilCenter", "iris", "pupil", "earCorner", "noseCorner", "eyelidTop", "eyelidBottom", "led", "filteredLED", "eyeFrame"].contains(row.key) {
-            content.secondaryText = "Waiting for eye-tracker feature frames…"
-        } else {
-            content.secondaryText = monitor.isRunning ? "Waiting for sensor data…" : "No samples · sensors paused or disconnected"
-        }
-        cell.contentConfiguration = content
-        cell.accessibilityIdentifier = "sensor.\(row.key)"
-    }
-
-    private func addHUDIfNeeded() {
-        guard ready, hud == nil else { return }
-        let screen = StatusHUD()
-        hud = screen
-        Evs.shared.screenService.addScreen(screen: screen)
-    }
-    private func updateHUD() {
-        guard ready else { return }
-        addHUDIfNeeded()
-        let values = latest?.readings ?? [:]
-        hud?.update([
-            monitoringWanted ? "Sensor status • 1s" : "Sensor status • paused",
-            "Battery " + (values["battery"]?.value ?? "—") + "  Light " + (values["ambient"]?.value ?? "—"),
-            values["orientation"]?.value ?? "Waiting for orientation",
-            "Eye " + (values["eyeState"]?.value ?? "—") + "  Pupil " + (values["pupilVisibility"]?.value ?? "—")
-        ])
-    }
-
     private final class ConnectionListener: NSObject, IM2GlassesConnectionEvents {
         var changed: (() -> Void)?
         var failed: (() -> Void)?
@@ -390,22 +487,73 @@ final class ViewController: UITableViewController {
         func onReady() { changed?() }
         func onUnReady() { changed?() }
     }
-    private final class StatusHUD: M2Screen {
-        private var lines: [M2Text] = []
-        init() { super.init(width: 540, height: 280, tag: "sensor-status") }
+    private final class MessageHUD: M2Screen {
+        var gesture: ((M2Touch) -> Void)?
+        private var dmHeader: M2Text?
+        private var dmRows: [M2Text] = []
+        private var conversationText: M2Text?
+        private var senderText: M2Text?
+        private var bodyRows: [M2Text] = []
+        private var footerText: M2Text?
+        private var names: [String] = []
+        private var highlighted = 0
+        private var focusDMs = true
+        private var conversation = "Messages"
+        private var sender = ""
+        private var body: [String] = []
+        private var footer = ""
+        private var testing = false
+
+        init() { super.init(width: 540, height: 320, tag: "discord-messages") }
         override func onCreate() {
-            lines.removeAll()
-            for index in 0..<4 {
-                let text = M2Text(text: "", tag: "status-line-\(index)")
-                _ = text.setXY(x: 18, y: Float(42 + index * 52))
-                _ = text.setColor(evsColor: index == 0 ? .green : .white)
-                _ = text.setScale(scale: 0.7)
-                _ = add(drawable: text)
-                lines.append(text)
+            dmRows.removeAll(); bodyRows.removeAll()
+            func label(_ tag: String, x: Float, y: Float, scale: Float) -> M2Text {
+                let text = M2Text(text: "", tag: tag)
+                _ = text.setXY(x: x, y: y); _ = text.setScale(scale: scale)
+                _ = text.setColor(evsColor: .white); _ = add(drawable: text)
+                return text
             }
+            dmHeader = label("dm-header", x: 14, y: 22, scale: 0.6)
+            for index in 0..<6 { dmRows.append(label("dm-\(index)", x: 14, y: Float(66 + index * 33), scale: 0.55)) }
+            let divider = M2RectOutline(color: .green, tag: "dm-divider")
+            _ = divider.setDimensions(x: 162, y: 16, width: 1, height: 252)
+            _ = add(drawable: divider)
+            conversationText = label("conversation", x: 178, y: 22, scale: 0.65)
+            senderText = label("sender", x: 178, y: 56, scale: 0.48)
+            for index in 0..<5 { bodyRows.append(label("body-\(index)", x: 178, y: Float(94 + index * 34), scale: 0.65)) }
+            footerText = label("navigation", x: 14, y: 285, scale: 0.4)
+            render()
         }
-        func update(_ values: [String]) {
-            for (text, value) in zip(lines, values) { _ = text.setText(text: value) }
+        override func onRelease() {
+            dmHeader = nil; dmRows.removeAll(); conversationText = nil; senderText = nil
+            bodyRows.removeAll(); footerText = nil
+            super.onRelease()
+        }
+        override func onTouch(touch: M2Touch) { gesture?(touch) }
+        func update(names: [String], highlighted: Int, focusDMs: Bool, conversation: String,
+                    sender: String, body: [String], footer: String, testing: Bool) {
+            self.names = names; self.highlighted = highlighted; self.focusDMs = focusDMs
+            self.conversation = conversation; self.sender = sender; self.body = body
+            self.footer = footer; self.testing = testing
+            render()
+        }
+        private func render() {
+            let start = max(0, min(highlighted - 2, names.count - 6))
+            let count = names.isEmpty ? "" : " \(highlighted + 1)/\(names.count)"
+            _ = dmHeader?.setText(text: (testing ? "TEST DMs" : "DMs") + count)
+            _ = dmHeader?.setColor(evsColor: focusDMs ? .green : .white)
+            for (offset, text) in dmRows.enumerated() {
+                let index = start + offset
+                let selected = index == highlighted
+                let value = names.indices.contains(index) ? (selected ? "> " : "  ") + String(names[index].prefix(13)) : ""
+                _ = text.setText(text: value)
+                _ = text.setColor(evsColor: selected ? .green : .white)
+            }
+            _ = conversationText?.setText(text: String(((focusDMs ? "" : "> ") + conversation).prefix(28)))
+            _ = conversationText?.setColor(evsColor: focusDMs ? .white : .green)
+            _ = senderText?.setText(text: String(sender.prefix(38)))
+            for (index, text) in bodyRows.enumerated() { _ = text.setText(text: body.indices.contains(index) ? body[index] : "") }
+            _ = footerText?.setText(text: footer)
         }
     }
 }

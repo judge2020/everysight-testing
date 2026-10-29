@@ -7,19 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D00000030000000000000001 = {isa = PBXBuildFile; fileRef = D00000120000000000000001; };
+		D00000010000000000000001 = {isa = PBXBuildFile; fileRef = D00000110000000000000001; };
+		D00000020000000000000001 = {isa = PBXBuildFile; fileRef = D00000110000000000000001; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A00000010000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000110000000000000001 /* AppDelegate.swift */; };
 		A00000020000000000000001 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000120000000000000001 /* ViewController.swift */; };
 		A00000060000000000000001 /* MaverickAI in Frameworks */ = {isa = PBXBuildFile; productRef = A00000710000000000000001 /* MaverickAI */; };
-		B00000010000000000000001 /* SensorMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000110000000000000001 /* SensorMonitor.swift */; };
+		B00000010000000000000001 /* DiscordBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = B00000110000000000000001 /* DiscordBridge.mm */; };
 /* End PBXBuildFile section */
+		D00000200000000000000001 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 10; files = (D00000020000000000000001, ); name = "Embed Discord SDK"; runOnlyForDeploymentPostprocessing = 0; };
 
 /* Begin PBXFileReference section */
+        D00000150000000000000001 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = SOURCE_ROOT; };
+		D00000130000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DiscordBridge.h; sourceTree = "<group>"; };
+		D00000140000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BridgingHeader.h; sourceTree = "<group>"; };
+		D00000120000000000000001 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageLayout.swift; sourceTree = "<group>"; };
+		D00000110000000000000001 = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; path = ../.local/discord-sdk/discord_social_sdk/lib/release/discord_partner_sdk.xcframework; sourceTree = SOURCE_ROOT; };
 		A00000100000000000000001 /* EverysightPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = EverysightPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000110000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A00000120000000000000001 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
 		A00000140000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000150000000000000001 /* sdk.key */ = {isa = PBXFileReference; explicitFileType = compiled; path = sdk.key; sourceTree = "<group>"; };
-		B00000110000000000000001 /* SensorMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorMonitor.swift; sourceTree = "<group>"; };
+		B00000110000000000000001 /* DiscordBridge.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = DiscordBridge.mm; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -28,6 +37,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000060000000000000001 /* MaverickAI in Frameworks */,
+				D00000010000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -38,6 +48,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000310000000000000001 /* EverysightPlayground */,
+                D00000150000000000000001 /* App.xcconfig */,
 				A00000320000000000000001 /* Frameworks */,
 				A00000330000000000000001 /* Products */,
 			);
@@ -49,7 +60,10 @@
 				A00000150000000000000001 /* sdk.key */,
 				A00000110000000000000001 /* AppDelegate.swift */,
 				A00000120000000000000001 /* ViewController.swift */,
-				B00000110000000000000001 /* SensorMonitor.swift */,
+				B00000110000000000000001 /* DiscordBridge.mm */,
+				D00000120000000000000001,
+				D00000130000000000000001,
+				D00000140000000000000001,
 				A00000140000000000000001 /* Info.plist */,
 			);
 			path = EverysightPlayground;
@@ -58,6 +72,7 @@
 		A00000320000000000000001 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				D00000110000000000000001,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -79,6 +94,7 @@
 			buildPhases = (
 				A00000210000000000000001 /* Sources */,
 				A00000200000000000000001 /* Frameworks */,
+				D00000200000000000000001,
 				A00000220000000000000001 /* Resources */,
 				A00000810000000000000001 /* Copy optional SDK key */,
 				A00000800000000000000001 /* Copy Maverick AI Compose Resources */,
@@ -158,7 +174,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# The SDK ships its Compose resources inside the framework bundle. iOS does not\n# look for them there, so copy them up into the .app or SDK images and fonts will\n# be missing at runtime. Do not remove this phase.\nfor FW in \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Frameworks/\"*.framework; do\n    if [ -d \"$FW/compose-resources\" ]; then\n        rsync -av \"$FW/compose-resources\" \\\n            \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/\"\n    fi\ndone\n";
+			shellScript = "# The SDK ships its Compose resources inside the framework bundle. iOS does not\n# look for them there, so copy them up into the .app or SDK images and fonts will\n# be missing at runtime. Do not remove this phase.\nfor FW in \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Frameworks/\"*.framework; do\n    if [ -d \"$FW/compose-resources\" ]; then\n		rsync -av \"$FW/compose-resources\" \\\n		    \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/\"\n    fi\ndone\n";
 		};
 		A00000810000000000000001 /* Copy optional SDK key */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -188,7 +204,8 @@
 			files = (
 				A00000010000000000000001 /* AppDelegate.swift in Sources */,
 				A00000020000000000000001 /* ViewController.swift in Sources */,
-				B00000010000000000000001 /* SensorMonitor.swift in Sources */,
+				B00000010000000000000001 /* DiscordBridge.mm in Sources */,
+				D00000030000000000000001,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -229,6 +246,7 @@
 		};
 		A00000620000000000000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
+            baseConfigurationReference = D00000150000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -240,7 +258,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.judge2020.everysightplayground;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -248,12 +265,15 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
+				SWIFT_OBJC_BRIDGING_HEADER = EverysightPlayground/BridgingHeader.h;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		A00000630000000000000001 /* Release */ = {
 			isa = XCBuildConfiguration;
+            baseConfigurationReference = D00000150000000000000001 /* App.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
@@ -265,7 +285,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.judge2020.everysightplayground;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -273,6 +292,8 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_VERSION = 5.0;
+				SWIFT_OBJC_BRIDGING_HEADER = EverysightPlayground/BridgingHeader.h;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;

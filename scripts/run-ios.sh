@@ -27,4 +27,6 @@ else
 fi
 xcrun simctl bootstatus "$device" -b
 xcrun simctl install "$device" .local/DerivedData/Build/Products/Debug-iphonesimulator/EverysightPlayground.app
-xcrun simctl launch "$device" com.judge2020.everysightplayground
+app=.local/DerivedData/Build/Products/Debug-iphonesimulator/EverysightPlayground.app
+bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")
+xcrun simctl launch "$device" "$bundle_id"

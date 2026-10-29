@@ -11,3 +11,6 @@ __pycache__/
 *.key
 .env
 .env.*
+
+# Developer-specific application identifiers and signing overrides.
+ios/Local.xcconfig
