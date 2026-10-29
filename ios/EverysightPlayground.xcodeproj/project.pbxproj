@@ -1,0 +1,323 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A00000010000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000110000000000000001 /* AppDelegate.swift */; };
+		A00000020000000000000001 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000120000000000000001 /* ViewController.swift */; };
+		A00000060000000000000001 /* MaverickAI in Frameworks */ = {isa = PBXBuildFile; productRef = A00000710000000000000001 /* MaverickAI */; };
+		B00000010000000000000001 /* SensorMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000110000000000000001 /* SensorMonitor.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A00000100000000000000001 /* EverysightPlayground.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = EverysightPlayground.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A00000110000000000000001 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A00000120000000000000001 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		A00000140000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A00000150000000000000001 /* sdk.key */ = {isa = PBXFileReference; explicitFileType = compiled; path = sdk.key; sourceTree = "<group>"; };
+		B00000110000000000000001 /* SensorMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SensorMonitor.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A00000200000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000060000000000000001 /* MaverickAI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A00000300000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A00000310000000000000001 /* EverysightPlayground */,
+				A00000320000000000000001 /* Frameworks */,
+				A00000330000000000000001 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A00000310000000000000001 /* EverysightPlayground */ = {
+			isa = PBXGroup;
+			children = (
+				A00000150000000000000001 /* sdk.key */,
+				A00000110000000000000001 /* AppDelegate.swift */,
+				A00000120000000000000001 /* ViewController.swift */,
+				B00000110000000000000001 /* SensorMonitor.swift */,
+				A00000140000000000000001 /* Info.plist */,
+			);
+			path = EverysightPlayground;
+			sourceTree = "<group>";
+		};
+		A00000320000000000000001 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		A00000330000000000000001 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A00000100000000000000001 /* EverysightPlayground.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A00000400000000000000001 /* EverysightPlayground */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A00000530000000000000001 /* Build configuration list for PBXNativeTarget "EverysightPlayground" */;
+			buildPhases = (
+				A00000210000000000000001 /* Sources */,
+				A00000200000000000000001 /* Frameworks */,
+				A00000220000000000000001 /* Resources */,
+				A00000810000000000000001 /* Copy optional SDK key */,
+				A00000800000000000000001 /* Copy Maverick AI Compose Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EverysightPlayground;
+			packageProductDependencies = (
+				A00000710000000000000001 /* MaverickAI */,
+			);
+			productName = EverysightPlayground;
+			productReference = A00000100000000000000001 /* EverysightPlayground.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A00000500000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					A00000400000000000000001 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = A00000520000000000000001 /* Build configuration list for PBXProject "EverysightPlayground" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A00000300000000000000001;
+			packageReferences = (
+				A00000700000000000000001 /* XCRemoteSwiftPackageReference "mav-ai-ios-spm" */,
+			);
+			productRefGroup = A00000330000000000000001 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A00000400000000000000001 /* EverysightPlayground */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A00000220000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A00000800000000000000001 /* Copy Maverick AI Compose Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Maverick AI Compose Resources";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The SDK ships its Compose resources inside the framework bundle. iOS does not\n# look for them there, so copy them up into the .app or SDK images and fonts will\n# be missing at runtime. Do not remove this phase.\nfor FW in \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/Frameworks/\"*.framework; do\n    if [ -d \"$FW/compose-resources\" ]; then\n        rsync -av \"$FW/compose-resources\" \\\n            \"${TARGET_BUILD_DIR}/${PRODUCT_NAME}.app/\"\n    fi\ndone\n";
+		};
+		A00000810000000000000001 /* Copy optional SDK key */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy optional SDK key";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "KEY=\"${SRCROOT}/EverysightPlayground/sdk.key\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/sdk.key\"\nif [ -s \"$KEY\" ]; then\n  mkdir -p \"$(dirname \"$DEST\")\"\n  cp \"$KEY\" \"$DEST\"\nelse\n  rm -f \"$DEST\"\n  echo \"warning: Add ios/EverysightPlayground/sdk.key to enable glasses and simulator connections. See README.md.\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A00000210000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000010000000000000001 /* AppDelegate.swift in Sources */,
+				A00000020000000000000001 /* ViewController.swift in Sources */,
+				B00000010000000000000001 /* SensorMonitor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A00000600000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+			};
+			name = Debug;
+		};
+		A00000610000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 3;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				SDKROOT = iphoneos;
+			};
+			name = Release;
+		};
+		A00000620000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EverysightPlayground/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.judge2020.everysightplayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A00000630000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				"EXCLUDED_ARCHS[sdk=iphonesimulator*]" = x86_64;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = EverysightPlayground/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.judge2020.everysightplayground;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A00000520000000000000001 /* Build configuration list for PBXProject "EverysightPlayground" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000600000000000000001 /* Debug */,
+				A00000610000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A00000530000000000000001 /* Build configuration list for PBXNativeTarget "EverysightPlayground" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A00000620000000000000001 /* Debug */,
+				A00000630000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A00000700000000000000001 /* XCRemoteSwiftPackageReference "mav-ai-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/everysight-maverick-AI/mav-ai-ios-spm.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.2.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A00000710000000000000001 /* MaverickAI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A00000700000000000000001 /* XCRemoteSwiftPackageReference "mav-ai-ios-spm" */;
+			productName = MaverickAI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A00000500000000000000001 /* Project object */;
+}

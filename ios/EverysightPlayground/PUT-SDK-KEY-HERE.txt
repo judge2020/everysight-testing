@@ -1,0 +1,9 @@
+Place your real Everysight developer key here as sdk.key, then rebuild.
+From the repository root: ios/EverysightPlayground/sdk.key
+
+Bundle ID: com.judge2020.everysightplayground
+The key must cover this namespace. Change the bundle ID if your key covers another.
+
+The build copies a nonempty key into the application bundle. Without a key the app
+still builds and initializes; connecting requires a real key. The key is ignored
+by Git. See the root README.md for official key request and simulator instructions.

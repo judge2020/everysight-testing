@@ -1,0 +1,15 @@
+{
+  "originHash" : "15037abb816372f54d784b5c4872f44f3fc7e55b579b76ebda6b7c3660b37ca4",
+  "pins" : [
+    {
+      "identity" : "mav-ai-ios-spm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/everysight-maverick-AI/mav-ai-ios-spm.git",
+      "state" : {
+        "revision" : "20c0ce3c97c1a5f01fa79dc2499665c2f4e91a0e",
+        "version" : "0.2.0"
+      }
+    }
+  ],
+  "version" : 3
+}

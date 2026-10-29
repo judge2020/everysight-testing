@@ -1,0 +1,13 @@
+.local/
+.venv/
+.DS_Store
+__pycache__/
+*.pyc
+**/build/
+**/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+# Everysight credentials must never enter Git.
+*.key
+.env
+.env.*
